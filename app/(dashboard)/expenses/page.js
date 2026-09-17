@@ -7,6 +7,8 @@ import {
   ChevronRight,
   Search,
   ChevronDown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import api from "@/lib/api";
 import Modal from "@/components/Modal";
@@ -31,6 +33,14 @@ const CATEGORIES = [
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500];
 
+const emptyForm = {
+  category: "OTHER",
+  amount: "",
+  description: "",
+  paymentMethod: "CASH",
+  expenseDate: new Date().toISOString().slice(0, 10),
+};
+
 // Deterministic, distinct color per category so the table stays legible
 // as more categories are added, without hand-picking each one.
 const CATEGORY_COLORS = [
@@ -52,14 +62,10 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    category: "OTHER",
-    amount: "",
-    description: "",
-    paymentMethod: "CASH",
-    expenseDate: new Date().toISOString().slice(0, 10),
-  });
+  const [error, setError] = useState("");
+  const [form, setForm] = useState(emptyForm);
 
   // Filtering + pagination state — these all live on the server now,
   // so the page only ever holds the current page's rows.
@@ -116,24 +122,61 @@ export default function ExpensesPage() {
     if (page > totalPages) setPage(totalPages || 1);
   }, [totalPages, page]);
 
+  const openAdd = () => {
+    setEditingId(null);
+    setError("");
+    setForm(emptyForm);
+    setModalOpen(true);
+  };
+
+  const openEdit = (e) => {
+    setEditingId(e._id);
+    setError("");
+    setForm({
+      category: e.category,
+      amount: e.amount,
+      description: e.description || "",
+      paymentMethod: e.paymentMethod,
+      expenseDate: e.expenseDate
+        ? e.expenseDate.slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+    });
+    setModalOpen(true);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    setError("");
     setSaving(true);
     try {
-      await api.post("/expenses", form);
+      if (editingId) {
+        await api.put(`/expenses/${editingId}`, form);
+      } else {
+        await api.post("/expenses", form);
+        setPage(1);
+      }
       setModalOpen(false);
-      setForm({
-        category: "OTHER",
-        amount: "",
-        description: "",
-        paymentMethod: "CASH",
-        expenseDate: new Date().toISOString().slice(0, 10),
-      });
-      setPage(1);
+      setForm(emptyForm);
+      setEditingId(null);
       load();
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to save expense");
     } finally {
       setSaving(false);
     }
+  };
+
+  const removeExpense = async (e) => {
+    if (
+      !confirm(
+        `Remove this ${e.category
+          .replace(/_/g, " ")
+          .toLowerCase()} expense of ${formatBDT(e.amount)}?`
+      )
+    )
+      return;
+    await api.delete(`/expenses/${e._id}`);
+    load();
   };
 
   const rangeStart = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -221,7 +264,7 @@ export default function ExpensesPage() {
             <Download size={16} /> Export
           </button>
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={openAdd}
             className="btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center"
           >
             <Plus size={16} /> Add Expense
@@ -250,12 +293,13 @@ export default function ExpensesPage() {
               <th className="p-3 font-medium">Description</th>
               <th className="p-3 font-medium">Method</th>
               <th className="p-3 font-medium text-right">Amount</th>
+              <th className="p-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-slate-400">
+                <td colSpan={7} className="p-6 text-center text-slate-400">
                   Loading expenses...
                 </td>
               </tr>
@@ -280,11 +324,29 @@ export default function ExpensesPage() {
                   <td className="p-3 text-right font-medium">
                     {formatBDT(e.amount)}
                   </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-3 justify-end">
+                      <button
+                        onClick={() => openEdit(e)}
+                        className="text-slate-400 hover:text-brand-600"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => removeExpense(e)}
+                        className="text-slate-400 hover:text-red-600"
+                        title="Remove"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             {!loading && expenses.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-slate-400">
+                <td colSpan={7} className="p-6 text-center text-slate-400">
                   No expenses match your filters.
                 </td>
               </tr>
@@ -322,6 +384,20 @@ export default function ExpensesPage() {
                 <span className="text-xs text-slate-500">
                   {e.paymentMethod}
                 </span>
+              </div>
+              <div className="flex items-center gap-4 pt-1">
+                <button
+                  onClick={() => openEdit(e)}
+                  className="text-xs text-slate-500 hover:text-brand-600 flex items-center gap-1"
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => removeExpense(e)}
+                  className="text-xs text-slate-500 hover:text-red-600 flex items-center gap-1"
+                >
+                  <Trash2 size={13} /> Remove
+                </button>
               </div>
             </div>
           ))}
@@ -405,7 +481,7 @@ export default function ExpensesPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Add Expense"
+        title={editingId ? "Edit Expense" : "Add Expense"}
       >
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -472,6 +548,13 @@ export default function ExpensesPage() {
               }
             />
           </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
             <button
               type="button"
@@ -481,7 +564,7 @@ export default function ExpensesPage() {
               Cancel
             </button>
             <button className="btn-primary" disabled={saving}>
-              {saving ? "Saving..." : "Save Expense"}
+              {saving ? "Saving..." : editingId ? "Update" : "Save Expense"}
             </button>
           </div>
         </form>

@@ -27,6 +27,8 @@ export default function UsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [pwModalUser, setPwModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [copyLabel, setCopyLabel] = useState("Copy");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -47,9 +49,15 @@ export default function UsersPage() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search]);
+  useEffect(() => {
+    load(); /* eslint-disable-next-line */
+  }, [search]);
 
-  const openNew = () => { setForm(emptyForm); setError(""); setModalOpen(true); };
+  const openNew = () => {
+    setForm(emptyForm);
+    setError("");
+    setModalOpen(true);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -84,11 +92,26 @@ export default function UsersPage() {
     }
   };
 
-  const resetPassword = async () => {
-    if (!newPassword || newPassword.length < 6) return;
-    await api.put(`/users/${pwModalUser._id}/password`, { password: newPassword });
-    setPwModalUser(null);
+  const resetPassword = async (opts = {}) => {
+    // opts.generate = true means "recover/regenerate" — let the server create a secure random password.
+    if (!opts.generate && (!newPassword || newPassword.length < 6)) return;
+    const { data } = await api.put(
+      `/users/${pwModalUser._id}/password`,
+      opts.generate ? {} : { password: newPassword }
+    );
+    setGeneratedPassword(data.generatedPassword || newPassword);
     setNewPassword("");
+    setCopyLabel("Copy");
+  };
+
+  const copyGenerated = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedPassword);
+      setCopyLabel("Copied!");
+      setTimeout(() => setCopyLabel("Copy"), 2000);
+    } catch {
+      // clipboard not available — user can still select/copy manually
+    }
   };
 
   const removeUser = async (u) => {
@@ -105,8 +128,12 @@ export default function UsersPage() {
     return (
       <div className="card max-w-md mx-auto text-center py-10">
         <ShieldAlert className="mx-auto text-slate-300 mb-3" size={36} />
-        <p className="font-medium text-slate-700">Only Super Admin can manage users</p>
-        <p className="text-sm text-slate-400 mt-1">Ask your Super Admin to grant you access.</p>
+        <p className="font-medium text-slate-700">
+          Only Super Admin can manage users
+        </p>
+        <p className="text-sm text-slate-400 mt-1">
+          Ask your Super Admin to grant you access.
+        </p>
       </div>
     );
   }
@@ -115,10 +142,23 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div className="relative w-full sm:w-80">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-9" placeholder="Search name or email..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            className="input pl-9"
+            placeholder="Search name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <button onClick={openNew} className="btn-primary flex items-center gap-2"><Plus size={16} /> Add User</button>
+        <button
+          onClick={openNew}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus size={16} /> Add User
+        </button>
       </div>
 
       <div className="card overflow-x-auto p-0">
@@ -136,9 +176,15 @@ export default function UsersPage() {
             {users.map((u) => {
               const isSelf = me?.id === u._id;
               return (
-                <tr key={u._id} className="border-b border-slate-50 last:border-0">
+                <tr
+                  key={u._id}
+                  className="border-b border-slate-50 last:border-0"
+                >
                   <td className="p-3 font-medium text-slate-800">
-                    {u.name} {isSelf && <span className="text-xs text-slate-400">(you)</span>}
+                    {u.name}{" "}
+                    {isSelf && (
+                      <span className="text-xs text-slate-400">(you)</span>
+                    )}
                   </td>
                   <td className="p-3 text-slate-600">{u.email}</td>
                   <td className="p-3">
@@ -148,25 +194,49 @@ export default function UsersPage() {
                       disabled={isSelf}
                       onChange={(e) => changeRole(u._id, e.target.value)}
                     >
-                      {roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABELS[r] || r}
+                        </option>
+                      ))}
                     </select>
                   </td>
                   <td className="p-3">
                     <button
                       disabled={isSelf}
                       onClick={() => toggleActive(u)}
-                      className={`badge ${u.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"} ${isSelf ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                      className={`badge ${
+                        u.isActive
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-600"
+                      } ${
+                        isSelf
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }`}
                     >
                       {u.isActive ? "Active" : "Inactive"}
                     </button>
                   </td>
                   <td className="p-3">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => setPwModalUser(u)} className="text-slate-400 hover:text-brand-600" title="Reset password">
+                      <button
+                        onClick={() => {
+                          setPwModalUser(u);
+                          setNewPassword("");
+                          setGeneratedPassword("");
+                        }}
+                        className="text-slate-400 hover:text-brand-600"
+                        title="Reset password"
+                      >
                         <KeyRound size={16} />
                       </button>
                       {!isSelf && (
-                        <button onClick={() => removeUser(u)} className="text-slate-400 hover:text-red-600" title="Delete user">
+                        <button
+                          onClick={() => removeUser(u)}
+                          className="text-slate-400 hover:text-red-600"
+                          title="Delete user"
+                        >
                           <Trash2 size={16} />
                         </button>
                       )}
@@ -175,48 +245,158 @@ export default function UsersPage() {
                 </tr>
               );
             })}
-            {users.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No users found.</td></tr>}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-slate-400">
+                  No users found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add User">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add User"
+      >
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="label">Full Name</label>
-            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input
+              className="input"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </div>
           <div>
             <label className="label">Email</label>
-            <input type="email" className="input" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input
+              type="email"
+              className="input"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
           </div>
           <div>
             <label className="label">Temporary Password</label>
-            <input type="password" className="input" required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <input
+              type="password"
+              className="input"
+              required
+              minLength={6}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
           </div>
           <div>
             <label className="label">Role</label>
-            <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <select
+              className="input"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+            >
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button className="btn-primary" disabled={saving}>{saving ? "Saving..." : "Create User"}</button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button className="btn-primary" disabled={saving}>
+              {saving ? "Saving..." : "Create User"}
+            </button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={!!pwModalUser} onClose={() => setPwModalUser(null)} title={`Reset password — ${pwModalUser?.name || ""}`}>
+      <Modal
+        open={!!pwModalUser}
+        onClose={() => setPwModalUser(null)}
+        title={`Recover / Reset Password — ${pwModalUser?.name || ""}`}
+      >
         <div className="space-y-4">
-          <div>
-            <label className="label">New Password</label>
-            <input type="password" className="input" minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button className="btn-secondary" onClick={() => setPwModalUser(null)}>Cancel</button>
-            <button className="btn-primary" onClick={resetPassword}>Update Password</button>
+          <p className="text-sm text-slate-500">
+            If {pwModalUser?.name} forgot their password, you can generate a new
+            secure one instantly, or set a specific password yourself.
+          </p>
+
+          {generatedPassword ? (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-medium text-emerald-700">
+                New password — share this with the user, it won't be shown
+                again:
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-white border border-emerald-200 rounded-lg px-3 py-2 text-sm font-mono tracking-wide select-all">
+                  {generatedPassword}
+                </code>
+                <button
+                  type="button"
+                  className="btn-secondary text-xs"
+                  onClick={copyGenerated}
+                >
+                  {copyLabel}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="label">Set a specific new password</label>
+                <input
+                  type="password"
+                  className="input"
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                />
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <button
+                  type="button"
+                  className="text-sm text-brand-600 font-medium hover:underline"
+                  onClick={() => resetPassword({ generate: true })}
+                >
+                  Or generate a random password instead
+                </button>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              className="btn-secondary"
+              onClick={() => setPwModalUser(null)}
+            >
+              {generatedPassword ? "Done" : "Cancel"}
+            </button>
+            {!generatedPassword && (
+              <button
+                className="btn-primary"
+                onClick={() => resetPassword()}
+                disabled={!newPassword || newPassword.length < 6}
+              >
+                Set Password
+              </button>
+            )}
           </div>
         </div>
       </Modal>

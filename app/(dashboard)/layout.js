@@ -16,6 +16,9 @@ const titles = {
   "/finance": "Finance",
   "/reports": "Reports",
   "/users": "Users & Roles",
+  "/settings": "Settings",
+  "/profile": "My Profile",
+  "/boosting-cost": "Boosting Cost",
 };
 
 export default function DashboardLayout({ children }) {

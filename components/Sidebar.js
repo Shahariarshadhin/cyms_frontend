@@ -15,6 +15,7 @@ import {
   Settings,
   UserCog,
   X,
+  Rocket ,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
 
@@ -28,6 +29,7 @@ const nav = [
   { href: "/expenses", label: "Expenses", icon: Wallet },
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/boosting-cost", label: "Boosting Cost", icon: Rocket},
 ];
 
 // Only Super Admin sees Users & Roles management

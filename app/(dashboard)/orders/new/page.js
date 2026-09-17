@@ -140,7 +140,7 @@ export default function NewOrderPage() {
       <div className="space-y-5 max-w-2xl">
         <div className="card border-emerald-200 bg-emerald-50/50">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="text-emerald-600" size={28} />
+            <CheckCircle2 className="text-emerald-600 shrink-0" size={28} />
             <div>
               <p className="font-semibold text-slate-900">
                 Order {order.orderNumber} placed successfully
@@ -156,7 +156,7 @@ export default function NewOrderPage() {
           <h4 className="font-medium text-sm text-slate-500 mb-3">
             Customer Information
           </h4>
-          <div className="grid sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <Field label="Name" value={c?.name} />
             <Field label="Customer Code" value={c?.customerCode} />
             <Field label="Phone" value={c?.phone} />
@@ -182,12 +182,12 @@ export default function NewOrderPage() {
           {order.items.map((it, i) => (
             <div
               key={i}
-              className="flex justify-between text-sm py-1.5 border-b border-slate-50 last:border-0"
+              className="flex justify-between gap-2 text-sm py-1.5 border-b border-slate-50 last:border-0"
             >
-              <span>
+              <span className="min-w-0 truncate">
                 {it.productName} × {it.quantity}
               </span>
-              <span>{formatBDT(it.unitPrice * it.quantity)}</span>
+              <span className="shrink-0">{formatBDT(it.unitPrice * it.quantity)}</span>
             </div>
           ))}
           <div className="border-t border-slate-100 mt-3 pt-3 space-y-1 text-sm">
@@ -208,20 +208,20 @@ export default function NewOrderPage() {
               <span>{formatBDT(order.totalAmount)}</span>
             </div>
           </div>
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             <StatusBadge status={order.status} />
             <StatusBadge status={order.paymentStatus} />
             <StatusBadge status={order.deliveryStatus} />
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={resetForm} className="btn-secondary">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button onClick={resetForm} className="btn-secondary flex-1 sm:flex-none">
             Create Another Order
           </button>
           <button
             onClick={() => router.push("/orders")}
-            className="btn-primary"
+            className="btn-primary flex-1 sm:flex-none"
           >
             Go to Orders
           </button>
@@ -233,11 +233,11 @@ export default function NewOrderPage() {
   // ---------- Order creation form ----------
   return (
     <div className="space-y-5 max-w-3xl">
-      <div className="card space-y-4">
+      <div className="card space-y-5">
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
             <label className="label mb-0">Customer</label>
-            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
               <button
                 type="button"
                 onClick={() => {
@@ -277,14 +277,14 @@ export default function NewOrderPage() {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
-                  className="input pl-8"
+                  className="input !pl-8 w-full"
                   placeholder="Search customer by name or phone..."
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
                 />
               </div>
               <select
-                className="input"
+                className="input w-full"
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
               >
@@ -297,7 +297,7 @@ export default function NewOrderPage() {
               </select>
             </>
           ) : (
-            <div className="grid sm:grid-cols-2 gap-3 bg-slate-50 rounded-xl p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 rounded-xl p-4">
               <div>
                 <label className="label">Full Name *</label>
                 <input
@@ -396,9 +396,9 @@ export default function NewOrderPage() {
           </div>
           <div className="space-y-2">
             {items.map((it, i) => (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={i} className="rounded-xl border border-slate-100 p-3 space-y-2 sm:space-y-0 sm:flex sm:gap-2 sm:items-center sm:border-0 sm:p-0">
                 <select
-                  className="input flex-1"
+                  className="input w-full sm:flex-1"
                   value={it.product}
                   onChange={(e) => updateItem(i, { product: e.target.value })}
                 >
@@ -409,30 +409,39 @@ export default function NewOrderPage() {
                     </option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  min="1"
-                  className="input w-20"
-                  value={it.quantity}
-                  onChange={(e) =>
-                    updateItem(i, { quantity: Number(e.target.value) })
-                  }
-                />
-                <input
-                  type="number"
-                  className="input w-28"
-                  value={it.unitPrice}
-                  onChange={(e) =>
-                    updateItem(i, { unitPrice: Number(e.target.value) })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(i)}
-                  className="text-red-400 hover:text-red-600"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex gap-2 sm:contents">
+                  <div className="flex-1 sm:flex-none">
+                    <input
+                      type="number"
+                      min="1"
+                      className="input w-full sm:w-20"
+                      placeholder="Qty"
+                      value={it.quantity}
+                      onChange={(e) =>
+                        updateItem(i, { quantity: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div className="flex-1 sm:flex-none">
+                    <input
+                      type="number"
+                      className="input w-full sm:w-28"
+                      placeholder="Price"
+                      value={it.unitPrice}
+                      onChange={(e) =>
+                        updateItem(i, { unitPrice: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    className="text-red-400 hover:text-red-600 shrink-0 self-center px-1"
+                    aria-label="Remove item"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             ))}
             {items.length === 0 && (
@@ -441,7 +450,7 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Discount (৳)</label>
             <input
