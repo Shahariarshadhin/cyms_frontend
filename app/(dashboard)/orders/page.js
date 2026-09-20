@@ -1,7 +1,15 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Receipt, Wallet, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Receipt,
+  Wallet,
+  AlertCircle,
+  Trash2,
+  FileDown,
+} from "lucide-react";
 import api from "@/lib/api";
 import Modal from "@/components/Modal";
 import StatusBadge from "@/components/StatusBadge";
@@ -25,6 +33,13 @@ export default function OrdersPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("CASH");
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  // Whether the customer's coupon code should be printed on the invoice —
+  // off by default, toggled per download.
+  const [includeCoupon, setIncludeCoupon] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -40,9 +55,12 @@ export default function OrdersPage() {
   }, [search]);
 
   const stats = useMemo(() => {
-    const totalRevenue = orders.reduce((s, o) => s + (o.totalAmount || 0), 0);
-    const totalDue = orders.reduce((s, o) => s + (o.dueAmount || 0), 0);
-    const unpaidCount = orders.filter((o) => (o.dueAmount || 0) > 0).length;
+    // Cancelled orders shouldn't contribute revenue, due, or unpaid counts —
+    // there's nothing outstanding to collect on them.
+    const active = orders.filter((o) => o.status !== "CANCELLED");
+    const totalRevenue = active.reduce((s, o) => s + (o.totalAmount || 0), 0);
+    const totalDue = active.reduce((s, o) => s + (o.dueAmount || 0), 0);
+    const unpaidCount = active.filter((o) => (o.dueAmount || 0) > 0).length;
     return { count: orders.length, totalRevenue, totalDue, unpaidCount };
   }, [orders]);
 
@@ -50,6 +68,9 @@ export default function OrdersPage() {
     setDetailOpen(true);
     setDetailLoading(true);
     setDetail(null);
+    setConfirmingDelete(false);
+    setDeleteError("");
+    setIncludeCoupon(false);
     try {
       const { data } = await api.get(`/orders/${o._id}`);
       setDetail(data);
@@ -57,6 +78,12 @@ export default function OrdersPage() {
     } finally {
       setDetailLoading(false);
     }
+  };
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setConfirmingDelete(false);
+    setDeleteError("");
   };
 
   const recordPayment = async () => {
@@ -77,6 +104,55 @@ export default function OrdersPage() {
     const { data } = await api.get(`/orders/${detail.order._id}`);
     setDetail(data);
     load();
+  };
+
+  // window.open() hits the URL directly and skips whatever `api` does to
+  // attach the auth token, so the server rejects it as unauthorized. Fetch
+  // it through `api` instead (token included) and save the response as a
+  // file ourselves.
+  const downloadInvoice = async () => {
+    setDownloadingInvoice(true);
+    try {
+      const res = await api.get(`/orders/${detail.order._id}/invoice`, {
+        responseType: "blob",
+        params: { showCoupon: includeCoupon },
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-${detail.order.orderNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let message = "Failed to download invoice";
+      if (err?.response?.data instanceof Blob) {
+        try {
+          message =
+            JSON.parse(await err.response.data.text())?.message || message;
+        } catch {}
+      }
+      alert(message);
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
+
+  const deleteOrder = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await api.delete(`/orders/${detail.order._id}`);
+      setDetailOpen(false);
+      setConfirmingDelete(false);
+      load();
+    } catch (err) {
+      setDeleteError(err?.response?.data?.message || "Failed to delete order");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -247,7 +323,7 @@ export default function OrdersPage() {
 
       <Modal
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={closeDetail}
         title={detail?.order?.orderNumber || "Order"}
         wide
       >
@@ -342,6 +418,26 @@ export default function OrdersPage() {
               </div>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={downloadInvoice}
+                disabled={downloadingInvoice}
+                className="btn-secondary flex items-center gap-2 justify-center w-full sm:w-fit disabled:opacity-60"
+              >
+                <FileDown size={16} />{" "}
+                {downloadingInvoice ? "Preparing..." : "Download Invoice (PDF)"}
+              </button>
+              <label className="flex items-center gap-2 text-xs text-slate-500 select-none">
+                <input
+                  type="checkbox"
+                  className="accent-brand-600"
+                  checked={includeCoupon}
+                  onChange={(e) => setIncludeCoupon(e.target.checked)}
+                />
+                Show coupon code on invoice
+              </label>
+            </div>
+
             <div>
               <span className="text-xs text-slate-400 block mb-2">
                 Order status
@@ -396,6 +492,47 @@ export default function OrdersPage() {
                 </div>
               </div>
             )}
+
+            <div className="pt-2 border-t border-slate-100">
+              {!confirmingDelete ? (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-red-600 text-xs font-medium hover:underline flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Delete Order
+                </button>
+              ) : (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-3 space-y-2">
+                  <p className="text-sm text-red-700">
+                    Delete order {detail.order.orderNumber} permanently? Any
+                    reserved units not yet sold will be returned to stock. This
+                    can't be undone.
+                  </p>
+                  {deleteError && (
+                    <p className="text-xs text-red-600">{deleteError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={deleteOrder}
+                      disabled={deleting}
+                      className="text-xs font-medium bg-red-600 text-white rounded-lg px-3 py-1.5 hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {deleting ? "Deleting..." : "Yes, delete it"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmingDelete(false);
+                        setDeleteError("");
+                      }}
+                      disabled={deleting}
+                      className="text-xs font-medium text-slate-600 rounded-lg px-3 py-1.5 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>

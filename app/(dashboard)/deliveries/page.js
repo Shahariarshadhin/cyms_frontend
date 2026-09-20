@@ -158,7 +158,7 @@ export default function DeliveriesPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Tracking #</label>
+                <label className="text-xs text-slate-400 block mb-1">Tracking ##</label>
                 <input
                   className="input !py-1.5 !text-xs w-full"
                   defaultValue={d.trackingNumber}

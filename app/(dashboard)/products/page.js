@@ -7,6 +7,7 @@ import {
   Download,
   ImageIcon,
   PackagePlus,
+  PackageMinus,
   X,
   ChevronDown,
   AlertTriangle,
@@ -36,6 +37,14 @@ const emptyRestock = {
   supplier: "",
   location: "WAREHOUSE",
 };
+
+const emptyReduce = {
+  quantity: 1,
+  reason: "DAMAGED",
+  notes: "",
+};
+
+const REDUCE_REASONS = ["DAMAGED", "LOST", "RETURNED", "CANCELLED"];
 
 function ProductThumb({
   src,
@@ -83,6 +92,12 @@ export default function ProductsPage() {
   const [restockForm, setRestockForm] = useState(emptyRestock);
   const [restocking, setRestocking] = useState(false);
   const [restockError, setRestockError] = useState("");
+
+  const [reduceOpen, setReduceOpen] = useState(false);
+  const [reduceProduct, setReduceProduct] = useState(null);
+  const [reduceForm, setReduceForm] = useState(emptyReduce);
+  const [reducing, setReducing] = useState(false);
+  const [reduceError, setReduceError] = useState("");
 
   const [lightbox, setLightbox] = useState(null); // { src, title } | null
 
@@ -164,6 +179,13 @@ export default function ProductsPage() {
     setRestockOpen(true);
   };
 
+  const openReduce = (p) => {
+    setReduceProduct(p);
+    setReduceForm(emptyReduce);
+    setReduceError("");
+    setReduceOpen(true);
+  };
+
   const submitRestock = async (e) => {
     e.preventDefault();
     setRestockError("");
@@ -191,6 +213,26 @@ export default function ProductsPage() {
       );
     } finally {
       setRestocking(false);
+    }
+  };
+
+  const submitReduce = async (e) => {
+    e.preventDefault();
+    setReduceError("");
+    setReducing(true);
+    try {
+      await api.post("/inventory/decrease", {
+        productId: reduceProduct._id,
+        quantity: Number(reduceForm.quantity) || 1,
+        reason: reduceForm.reason,
+        notes: reduceForm.notes,
+      });
+      setReduceOpen(false);
+      load();
+    } catch (err) {
+      setReduceError(err?.response?.data?.message || "Failed to reduce stock");
+    } finally {
+      setReducing(false);
     }
   };
 
@@ -415,6 +457,13 @@ export default function ProductsPage() {
                         <PackagePlus size={14} /> Restock
                       </button>
                       <button
+                        onClick={() => openReduce(p)}
+                        disabled={p.quantity <= 0}
+                        className="text-red-600 text-xs font-medium hover:underline flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
+                      >
+                        <PackageMinus size={14} /> Reduce
+                      </button>
+                      <button
                         onClick={() => openEdit(p)}
                         className="text-brand-600 text-xs font-medium hover:underline"
                       >
@@ -490,6 +539,13 @@ export default function ProductsPage() {
                     className="text-emerald-600 font-medium hover:underline flex items-center gap-1"
                   >
                     <PackagePlus size={13} /> Restock
+                  </button>
+                  <button
+                    onClick={() => openReduce(p)}
+                    disabled={p.quantity <= 0}
+                    className="text-red-600 font-medium hover:underline flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
+                  >
+                    <PackageMinus size={13} /> Reduce
                   </button>
                   <button
                     onClick={() => openEdit(p)}
@@ -821,6 +877,114 @@ export default function ProductsPage() {
                 {restocking
                   ? "Restocking..."
                   : `Add ${restockForm.quantity || 1} Unit(s)`}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={reduceOpen}
+        onClose={() => setReduceOpen(false)}
+        title={`Reduce Stock — ${reduceProduct?.watchName || ""}`}
+      >
+        {reduceProduct && (
+          <form onSubmit={submitReduce} className="space-y-4">
+            <div className="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+              <ProductThumb
+                src={reduceProduct.image}
+                alt={reduceProduct.watchName}
+                onClick={() =>
+                  setLightbox({
+                    src: reduceProduct.image,
+                    title: reduceProduct.watchName,
+                  })
+                }
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  {reduceProduct.watchName}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {reduceProduct.sku} · currently {reduceProduct.quantity} in
+                  stock
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Quantity to Remove</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={reduceProduct.quantity}
+                  className="input"
+                  required
+                  value={reduceForm.quantity}
+                  onChange={(e) =>
+                    setReduceForm({ ...reduceForm, quantity: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Reason</label>
+                <select
+                  className="input"
+                  value={reduceForm.reason}
+                  onChange={(e) =>
+                    setReduceForm({ ...reduceForm, reason: e.target.value })
+                  }
+                >
+                  {REDUCE_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r.charAt(0) + r.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Notes (optional)</label>
+              <input
+                className="input"
+                placeholder="e.g. broken during shipping"
+                value={reduceForm.notes}
+                onChange={(e) =>
+                  setReduceForm({ ...reduceForm, notes: e.target.value })
+                }
+              />
+            </div>
+
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              This marks the oldest {reduceForm.quantity || 1} in-stock unit(s)
+              as {reduceForm.reason.toLowerCase()} and removes them from
+              available stock. It won't affect units already sold or reserved.
+            </p>
+
+            {reduceError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {reduceError}
+              </p>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setReduceOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                disabled={reducing}
+              >
+                <PackageMinus size={16} />{" "}
+                {reducing
+                  ? "Reducing..."
+                  : `Remove ${reduceForm.quantity || 1} Unit(s)`}
               </button>
             </div>
           </form>

@@ -8,6 +8,7 @@ import {
   UserPlus,
   Users,
   CheckCircle2,
+  FileDown,
 } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
@@ -40,6 +41,9 @@ export default function NewOrderPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
+  // Whether the customer's coupon code should be printed on the invoice —
+  // off by default, toggled per download.
+  const [includeCoupon, setIncludeCoupon] = useState(false);
 
   useEffect(() => {
     if (customerMode === "existing") {
@@ -85,6 +89,42 @@ export default function NewOrderPage() {
     setDeliveryCharge(0);
     setNotes("");
     setError("");
+    setIncludeCoupon(false);
+  };
+
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
+  // window.open() hits the URL directly and skips whatever `api` does to
+  // attach the auth token, so the server rejects it as unauthorized. Fetch
+  // it through `api` instead (token included) and save the response as a
+  // file ourselves.
+  const downloadInvoice = async (order) => {
+    setDownloadingInvoice(true);
+    try {
+      const res = await api.get(`/orders/${order._id}/invoice`, {
+        responseType: "blob",
+        params: { showCoupon: includeCoupon },
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-${order.orderNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      let message = "Failed to download invoice";
+      if (err?.response?.data instanceof Blob) {
+        try {
+          message = JSON.parse(await err.response.data.text())?.message || message;
+        } catch {}
+      }
+      alert(message);
+    } finally {
+      setDownloadingInvoice(false);
+    }
   };
 
   const submit = async () => {
@@ -215,13 +255,31 @@ export default function NewOrderPage() {
           </div>
         </div>
 
+        <label className="flex items-center gap-2 text-xs text-slate-500 select-none">
+          <input
+            type="checkbox"
+            className="accent-brand-600"
+            checked={includeCoupon}
+            onChange={(e) => setIncludeCoupon(e.target.checked)}
+          />
+          Show coupon code on invoice
+        </label>
+
         <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => downloadInvoice(order)}
+            disabled={downloadingInvoice}
+            className="btn-primary flex items-center gap-2 justify-center flex-1 sm:flex-none disabled:opacity-60"
+          >
+            <FileDown size={16} />{" "}
+            {downloadingInvoice ? "Preparing..." : "Download Invoice (PDF)"}
+          </button>
           <button onClick={resetForm} className="btn-secondary flex-1 sm:flex-none">
             Create Another Order
           </button>
           <button
             onClick={() => router.push("/orders")}
-            className="btn-primary flex-1 sm:flex-none"
+            className="btn-secondary flex-1 sm:flex-none"
           >
             Go to Orders
           </button>
