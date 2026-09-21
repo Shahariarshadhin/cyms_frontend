@@ -19,6 +19,7 @@ const titles = {
   "/settings": "Settings",
   "/profile": "My Profile",
   "/boosting-cost": "Boosting Cost",
+  "/research": "Product Research & Buy",
 };
 
 export default function DashboardLayout({ children }) {

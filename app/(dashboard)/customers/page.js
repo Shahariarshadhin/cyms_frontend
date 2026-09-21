@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Phone, MapPin, ChevronRight, Users } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Phone,
+  MapPin,
+  ChevronRight,
+  Users,
+  Trash2,
+} from "lucide-react";
 import api from "@/lib/api";
 import Modal from "@/components/Modal";
 import { formatBDT } from "@/lib/auth";
@@ -57,6 +65,9 @@ export default function CustomersPage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -94,11 +105,36 @@ export default function CustomersPage() {
     setProfileOpen(true);
     setProfileLoading(true);
     setProfile(null);
+    setConfirmingDelete(false);
+    setDeleteError("");
     try {
       const { data } = await api.get(`/customers/${c._id}`);
       setProfile(data);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const closeProfile = () => {
+    setProfileOpen(false);
+    setConfirmingDelete(false);
+    setDeleteError("");
+  };
+
+  const deleteCustomer = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await api.delete(`/customers/${profile.customer._id}`);
+      setProfileOpen(false);
+      setConfirmingDelete(false);
+      load();
+    } catch (err) {
+      setDeleteError(
+        err?.response?.data?.message || "Failed to delete customer"
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -327,7 +363,7 @@ export default function CustomersPage() {
 
       <Modal
         open={profileOpen}
-        onClose={() => setProfileOpen(false)}
+        onClose={closeProfile}
         title={profile?.customer?.name || "Customer Profile"}
         wide
       >
@@ -449,6 +485,48 @@ export default function CustomersPage() {
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              {!confirmingDelete ? (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-red-600 text-xs font-medium hover:underline flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Delete Customer
+                </button>
+              ) : (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-3 space-y-2">
+                  <p className="text-sm text-red-700">
+                    Delete {profile.customer.name} permanently? This can't be
+                    undone.
+                    {profile.totalOrders > 0 &&
+                      " Note: customers with existing orders can't be deleted — clear or reassign those orders first."}
+                  </p>
+                  {deleteError && (
+                    <p className="text-xs text-red-600">{deleteError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={deleteCustomer}
+                      disabled={deleting}
+                      className="text-xs font-medium bg-red-600 text-white rounded-lg px-3 py-1.5 hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {deleting ? "Deleting..." : "Yes, delete it"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmingDelete(false);
+                        setDeleteError("");
+                      }}
+                      disabled={deleting}
+                      className="text-xs font-medium text-slate-600 rounded-lg px-3 py-1.5 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

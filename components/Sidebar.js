@@ -15,7 +15,8 @@ import {
   Settings,
   UserCog,
   X,
-  Rocket ,
+  Rocket, 
+  FlaskConical,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
 
@@ -25,6 +26,7 @@ const nav = [
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/research", label: "Research & Buy", icon: FlaskConical },
   { href: "/deliveries", label: "Delivery", icon: Truck },
   { href: "/expenses", label: "Expenses", icon: Wallet },
   { href: "/finance", label: "Finance", icon: Wallet },
