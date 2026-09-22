@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Search,
@@ -26,6 +27,11 @@ const emptyForm = {
   notes: "",
 };
 
+const TABS = [
+  { key: "RESEARCHING", label: "Expected Buying List" },
+  { key: "PURCHASED", label: "Purchase Done" },
+];
+
 export default function ResearchPage() {
   const [tab, setTab] = useState("RESEARCHING"); // RESEARCHING | PURCHASED
   const [items, setItems] = useState([]);
@@ -42,7 +48,7 @@ export default function ResearchPage() {
   const [purchaseItem, setPurchaseItem] = useState(null);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const [purchasing, setPurchasing] = useState(false);
 
@@ -154,27 +160,28 @@ export default function ResearchPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-        <div className="flex gap-1 bg-white border border-slate-100 rounded-xl p-1 w-fit">
-          <button
-            onClick={() => setTab("RESEARCHING")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ${
-              tab === "RESEARCHING"
-                ? "bg-brand-600 text-white"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            Expected Buying List
-          </button>
-          <button
-            onClick={() => setTab("PURCHASED")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ${
-              tab === "PURCHASED"
-                ? "bg-brand-600 text-white"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            Purchase Done
-          </button>
+        {/* Segmented control with a sliding highlight */}
+        <div className="relative flex bg-slate-100 rounded-xl p-1 w-fit">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`relative z-10 px-3.5 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                tab === t.key
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab === t.key && (
+                <motion.span
+                  layoutId="research-tab-pill"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                  className="absolute inset-0 bg-brand-600 rounded-lg -z-10"
+                />
+              )}
+              {t.label}
+            </button>
+          ))}
         </div>
 
         <div className="flex gap-2">
@@ -204,114 +211,153 @@ export default function ResearchPage() {
       {loading && <div className="text-slate-400 text-sm">Loading...</div>}
 
       {!loading && items.length === 0 && (
-        <div className="card text-center py-12 text-slate-400">
-          {tab === "RESEARCHING"
-            ? "No products in the research list yet. Add one to get started."
-            : "No purchases recorded yet."}
+        <div className="card text-center py-16 text-slate-400">
+          <p className="font-medium text-slate-500">
+            {tab === "RESEARCHING"
+              ? "The research list is empty"
+              : "Nothing purchased yet"}
+          </p>
+          <p className="text-sm mt-1">
+            {tab === "RESEARCHING"
+              ? "Add a watch you're considering to start tracking it."
+              : "Items move here once you mark them Purchased."}
+          </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {items.map((item) => (
-          <div
-            key={item._id}
-            className="card !p-0 overflow-hidden flex flex-col"
-          >
-            <button
-              type="button"
-              className="relative w-full aspect-square bg-slate-100 group"
-              onClick={() =>
-                item.image &&
-                setImageModal({ src: item.image, alt: item.productName })
-              }
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 items-stretch">
+        <AnimatePresence mode="popLayout">
+          {items.map((item, index) => (
+            <motion.div
+              key={item._id}
+              layout
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.25, delay: Math.min(index, 8) * 0.03 }}
+              className="group relative flex flex-col h-full rounded-2xl border border-slate-200/80 bg-[#fbfaf8] overflow-hidden transition-shadow duration-300 hover:shadow-[0_8px_30px_-12px_rgba(15,23,42,0.18)]"
             >
-              {item.image ? (
-                <img
-                  src={item.image}
-                  alt={item.productName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <ImageIcon size={32} />
-                </div>
-              )}
-              {item.status === "PURCHASED" && (
-                <span className="absolute top-2 left-2 badge bg-emerald-600 text-white flex items-center gap-1">
-                  <CheckCircle2 size={12} /> Purchased
-                </span>
-              )}
-            </button>
-
-            <div className="p-4 flex flex-col gap-2 flex-1">
-              <p className="font-medium text-slate-800 leading-snug">
-                {item.productName}
-              </p>
-              <p className="text-sm text-slate-500">
-                Market Price:{" "}
-                <span className="font-medium text-slate-700">
-                  {formatBDT(item.marketPriceMin)} –{" "}
-                  {formatBDT(item.marketPriceMax)}
-                </span>
-              </p>
-              {item.status === "PURCHASED" && item.purchasedPrice != null && (
-                <p className="text-sm text-emerald-700">
-                  Bought at {formatBDT(item.purchasedPrice)}
-                  {item.purchasedDate
-                    ? ` on ${new Date(item.purchasedDate).toLocaleDateString()}`
-                    : ""}
-                </p>
-              )}
-              {item.sourceLink && (
-                <a
-                  href={item.sourceLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-brand-600 hover:underline flex items-center gap-1 w-fit"
-                >
-                  <ExternalLink size={12} /> Source
-                </a>
-              )}
-              {item.notes && (
-                <p className="text-xs text-slate-400 line-clamp-2">
-                  {item.notes}
-                </p>
-              )}
-
-              <div className="mt-auto pt-2 flex flex-wrap items-center gap-3 border-t border-slate-50">
-                {item.status === "RESEARCHING" ? (
-                  <>
-                    <button
-                      onClick={() => openPurchase(item)}
-                      className="text-xs font-medium text-emerald-600 hover:underline flex items-center gap-1"
-                    >
-                      <CheckCircle2 size={14} /> Purchase Done
-                    </button>
-                    <button
-                      onClick={() => openEdit(item)}
-                      className="text-xs font-medium text-brand-600 hover:underline flex items-center gap-1"
-                    >
-                      <Pencil size={13} /> Edit
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => revert(item)}
-                    className="text-xs font-medium text-slate-500 hover:underline flex items-center gap-1"
-                  >
-                    <RotateCcw size={13} /> Move Back
-                  </button>
-                )}
+              {/* Photo, framed like a catalog specimen with a lot number */}
+              <div className="relative p-3 pb-0">
                 <button
-                  onClick={() => remove(item)}
-                  className="text-xs font-medium text-red-500 hover:underline flex items-center gap-1 ml-auto"
+                  type="button"
+                  className="relative block w-full aspect-[4/5] rounded-xl overflow-hidden bg-slate-100"
+                  onClick={() =>
+                    item.image &&
+                    setImageModal({ src: item.image, alt: item.productName })
+                  }
                 >
-                  <Trash2 size={13} /> Delete
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.productName}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                      <ImageIcon size={30} />
+                    </div>
+                  )}
+                  <span className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
+
+                <span className="absolute top-5 left-5 font-mono text-[10px] tracking-wide bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded border border-slate-200 text-slate-500">
+                  No. {String(index + 1).padStart(3, "0")}
+                </span>
+
+                {item.status === "PURCHASED" && (
+                  <div className="absolute top-6 -right-9 rotate-45 z-10">
+                    <div className="w-36 text-center bg-emerald-600 text-white text-[10px] font-semibold tracking-wider py-1 shadow-sm">
+                      PURCHASED
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        ))}
+
+              {/* Details */}
+              <div className="p-4 pt-3 flex flex-col gap-1 flex-1">
+                <h3 className="font-serif text-[15px] leading-snug text-slate-900 line-clamp-2">
+                  {item.productName}
+                </h3>
+
+                <div className="flex items-baseline gap-1">
+                  <span className="text-amber-700 font-medium text-sm">
+                    Est. {formatBDT(item.marketPriceMin)} –{" "}
+                    {formatBDT(item.marketPriceMax)}
+                  </span>
+                </div>
+
+                <div className="">
+                  {item.status === "PURCHASED" &&
+                    item.purchasedPrice != null && (
+                      <p className="text-sm text-emerald-700">
+                        Bought at {formatBDT(item.purchasedPrice)}
+                        {item.purchasedDate
+                          ? ` · ${new Date(item.purchasedDate).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                    )}
+                </div>
+
+                <div className="">
+                  {item.sourceLink && (
+                    <a
+                      href={item.sourceLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-brand-700 bg-slate-100 hover:bg-brand-50 rounded-full px-2 py-1 transition-colors w-fit"
+                    >
+                      <ExternalLink size={11} /> Source
+                    </a>
+                  )}
+                </div>
+
+                <div className="min-h-[2.25rem]">
+                  {item.notes && (
+                    <p className="font-serif italic text-xs text-slate-400 line-clamp-2">
+                      "{item.notes}"
+                    </p>
+                  )}
+                </div>
+
+                {/* Footer stays pinned to the bottom via mt-auto */}
+                <div className="mt-auto pt-3 flex items-center gap-2 border-t border-slate-200/70">
+                  {item.status === "RESEARCHING" ? (
+                    <>
+                      <button
+                        onClick={() => openPurchase(item)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium py-2 transition-colors"
+                      >
+                        <CheckCircle2 size={14} /> Mark Purchased
+                      </button>
+                      <button
+                        onClick={() => openEdit(item)}
+                        title="Edit"
+                        className="p-2 rounded-lg text-slate-400 hover:text-brand-700 hover:bg-slate-100 transition-colors"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => revert(item)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium py-2 transition-colors"
+                    >
+                      <RotateCcw size={13} /> Move Back
+                    </button>
+                  )}
+                  <button
+                    onClick={() => remove(item)}
+                    title="Delete"
+                    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Add / Edit modal */}
@@ -442,7 +488,7 @@ export default function ResearchPage() {
                 placeholder={
                   purchaseItem
                     ? `Market: ${formatBDT(
-                        purchaseItem.marketPriceMin
+                        purchaseItem.marketPriceMin,
                       )}–${formatBDT(purchaseItem.marketPriceMax)}`
                     : ""
                 }
@@ -480,25 +526,41 @@ export default function ResearchPage() {
       </Modal>
 
       {/* Large image preview */}
-      {imageModal && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 sm:p-8"
-          onClick={() => setImageModal(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-white/80 hover:text-white"
+      <AnimatePresence>
+        {imageModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 sm:p-8"
             onClick={() => setImageModal(null)}
           >
-            <X size={28} />
-          </button>
-          <img
-            src={imageModal.src}
-            alt={imageModal.alt}
-            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+            <button
+              className="absolute top-4 right-4 text-white/80 hover:text-white"
+              onClick={() => setImageModal(null)}
+            >
+              <X size={28} />
+            </button>
+            <motion.figure
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.97, opacity: 0 }}
+              transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+              className="flex flex-col items-center gap-3 max-w-full max-h-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={imageModal.src}
+                alt={imageModal.alt}
+                className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+              />
+              <figcaption className="font-serif text-white/90 text-sm">
+                {imageModal.alt}
+              </figcaption>
+            </motion.figure>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
