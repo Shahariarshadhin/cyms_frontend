@@ -35,6 +35,9 @@ export default function NewOrderPage() {
 
   const [products, setProducts] = useState([]);
   const [items, setItems] = useState([]);
+  const [orderDate, setOrderDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [discount, setDiscount] = useState(0);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [notes, setNotes] = useState("");
@@ -74,7 +77,7 @@ export default function NewOrderPage() {
 
   const subtotal = items.reduce(
     (s, it) => s + (it.unitPrice || 0) * (it.quantity || 1),
-    0
+    0,
   );
   const grandTotal = subtotal - Number(discount) + Number(deliveryCharge);
 
@@ -85,6 +88,7 @@ export default function NewOrderPage() {
     setCustomerSearch("");
     setNewCustomer(emptyNewCustomer);
     setItems([]);
+    setOrderDate(new Date().toISOString().slice(0, 10));
     setDiscount(0);
     setDeliveryCharge(0);
     setNotes("");
@@ -118,7 +122,8 @@ export default function NewOrderPage() {
       let message = "Failed to download invoice";
       if (err?.response?.data instanceof Blob) {
         try {
-          message = JSON.parse(await err.response.data.text())?.message || message;
+          message =
+            JSON.parse(await err.response.data.text())?.message || message;
         } catch {}
       }
       alert(message);
@@ -134,12 +139,13 @@ export default function NewOrderPage() {
       return setError("Please select a customer");
     if (customerMode === "new" && (!newCustomer.name || !newCustomer.phone)) {
       return setError(
-        "Customer name and phone are required to place the order"
+        "Customer name and phone are required to place the order",
       );
     }
     if (items.length === 0) return setError("Add at least one item");
     if (items.some((it) => !it.product))
       return setError("Select a product for every item row");
+    if (!orderDate) return setError("Please select an order date");
 
     setSaving(true);
     try {
@@ -149,7 +155,7 @@ export default function NewOrderPage() {
       if (customerMode === "new") {
         const { data: createdCustomer } = await api.post(
           "/customers",
-          newCustomer
+          newCustomer,
         );
         finalCustomerId = createdCustomer._id;
       }
@@ -157,6 +163,7 @@ export default function NewOrderPage() {
       const { data: order } = await api.post("/orders", {
         customer: finalCustomerId,
         items,
+        orderDate,
         discount: Number(discount),
         deliveryCharge: Number(deliveryCharge),
         notes,
@@ -219,6 +226,9 @@ export default function NewOrderPage() {
           <h4 className="font-medium text-sm text-slate-500 mb-3">
             Order Summary
           </h4>
+          <p className="text-xs text-slate-400 -mt-1 mb-2">
+            Order Date: {new Date(order.orderDate).toLocaleDateString()}
+          </p>
           {order.items.map((it, i) => (
             <div
               key={i}
@@ -227,7 +237,9 @@ export default function NewOrderPage() {
               <span className="min-w-0 truncate">
                 {it.productName} × {it.quantity}
               </span>
-              <span className="shrink-0">{formatBDT(it.unitPrice * it.quantity)}</span>
+              <span className="shrink-0">
+                {formatBDT(it.unitPrice * it.quantity)}
+              </span>
             </div>
           ))}
           <div className="border-t border-slate-100 mt-3 pt-3 space-y-1 text-sm">
@@ -274,7 +286,10 @@ export default function NewOrderPage() {
             <FileDown size={16} />{" "}
             {downloadingInvoice ? "Preparing..." : "Download Invoice (PDF)"}
           </button>
-          <button onClick={resetForm} className="btn-secondary flex-1 sm:flex-none">
+          <button
+            onClick={resetForm}
+            className="btn-secondary flex-1 sm:flex-none"
+          >
             Create Another Order
           </button>
           <button
@@ -454,7 +469,10 @@ export default function NewOrderPage() {
           </div>
           <div className="space-y-2">
             {items.map((it, i) => (
-              <div key={i} className="rounded-xl border border-slate-100 p-3 space-y-2 sm:space-y-0 sm:flex sm:gap-2 sm:items-center sm:border-0 sm:p-0">
+              <div
+                key={i}
+                className="rounded-xl border border-slate-100 p-3 space-y-2 sm:space-y-0 sm:flex sm:gap-2 sm:items-center sm:border-0 sm:p-0"
+              >
                 <select
                   className="input w-full sm:flex-1"
                   value={it.product}
@@ -508,7 +526,16 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="label">Order Date</label>
+            <input
+              type="date"
+              className="input"
+              value={orderDate}
+              onChange={(e) => setOrderDate(e.target.value)}
+            />
+          </div>
           <div>
             <label className="label">Discount (৳)</label>
             <input

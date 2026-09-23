@@ -46,6 +46,14 @@ const emptyReduce = {
 
 const REDUCE_REASONS = ["DAMAGED", "LOST", "RETURNED", "CANCELLED"];
 
+// Stock status filter options shown in the toolbar dropdown.
+const STOCK_FILTERS = [
+  { value: "ALL", label: "All Stock" },
+  { value: "IN", label: "In Stock" },
+  { value: "LOW", label: "Low Stock" },
+  { value: "OUT", label: "Stock Out" },
+];
+
 function ProductThumb({
   src,
   alt,
@@ -80,7 +88,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [stockFilter, setStockFilter] = useState("ALL"); // ALL | LOW | OUT
+  const [stockFilter, setStockFilter] = useState("ALL"); // ALL | IN | LOW | OUT
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -128,9 +136,9 @@ export default function ProductsPage() {
   const categories = useMemo(
     () =>
       Array.from(
-        new Set(products.map((p) => p.category).filter(Boolean))
+        new Set(products.map((p) => p.category).filter(Boolean)),
       ).sort(),
-    [products]
+    [products],
   );
 
   const filtered = useMemo(() => {
@@ -139,6 +147,7 @@ export default function ProductsPage() {
         categoryFilter === "ALL" || p.category === categoryFilter;
       const matchesStock =
         stockFilter === "ALL" ||
+        (stockFilter === "IN" && p.quantity > 0) ||
         (stockFilter === "OUT" && p.quantity <= 0) ||
         (stockFilter === "LOW" &&
           p.quantity > 0 &&
@@ -152,13 +161,20 @@ export default function ProductsPage() {
       (s, p) =>
         s +
         ((p.purchasePrice || 0) + (p.additionalCost || 0)) * (p.quantity || 0),
-      0
+      0,
     );
+    const inStock = products.filter((p) => p.quantity > 0).length;
     const lowStock = products.filter(
-      (p) => p.quantity > 0 && p.quantity <= p.minimumStock
+      (p) => p.quantity > 0 && p.quantity <= p.minimumStock,
     ).length;
     const outOfStock = products.filter((p) => p.quantity <= 0).length;
-    return { total: products.length, totalValue, lowStock, outOfStock };
+    return {
+      total: products.length,
+      totalValue,
+      inStock,
+      lowStock,
+      outOfStock,
+    };
   }, [products]);
 
   const openNew = () => {
@@ -209,7 +225,7 @@ export default function ProductsPage() {
       load();
     } catch (err) {
       setRestockError(
-        err?.response?.data?.message || "Failed to restock product"
+        err?.response?.data?.message || "Failed to restock product",
       );
     } finally {
       setRestocking(false);
@@ -268,7 +284,7 @@ export default function ProductsPage() {
   const exportExcel = () => {
     window.open(
       `${process.env.NEXT_PUBLIC_API_URL}/excel/export/products`,
-      "_blank"
+      "_blank",
     );
   };
 
@@ -281,7 +297,7 @@ export default function ProductsPage() {
   return (
     <div className="space-y-5">
       {/* Stock health at a glance */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="card !p-3 !px-4">
           <p className="text-xs text-slate-400">Products</p>
           <p className="font-semibold text-lg">{stats.total}</p>
@@ -290,6 +306,19 @@ export default function ProductsPage() {
           <p className="text-xs text-slate-400">Inventory Value</p>
           <p className="font-semibold text-lg">{formatBDT(stats.totalValue)}</p>
         </div>
+        <button
+          onClick={() => setStockFilter(stockFilter === "IN" ? "ALL" : "IN")}
+          className={`card !p-3 !px-4 text-left transition-colors ${
+            stockFilter === "IN"
+              ? "ring-2 ring-emerald-300"
+              : "hover:bg-slate-50"
+          }`}
+        >
+          <p className="text-xs text-slate-400">In Stock</p>
+          <p className="font-semibold text-lg text-emerald-600">
+            {stats.inStock}
+          </p>
+        </button>
         <button
           onClick={() => setStockFilter(stockFilter === "LOW" ? "ALL" : "LOW")}
           className={`card !p-3 !px-4 text-left transition-colors ${
@@ -314,7 +343,7 @@ export default function ProductsPage() {
             stockFilter === "OUT" ? "ring-2 ring-red-300" : "hover:bg-slate-50"
           }`}
         >
-          <p className="text-xs text-slate-400">Out of Stock</p>
+          <p className="text-xs text-slate-400">Stock Out</p>
           <p className="font-semibold text-lg text-red-600">
             {stats.outOfStock}
           </p>
@@ -336,6 +365,26 @@ export default function ProductsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+
+          {/* Stock status filter */}
+          <div className="relative sm:w-44">
+            <select
+              className="input w-full appearance-none pr-9"
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+            >
+              {STOCK_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+          </div>
+
           {categories.length > 0 && (
             <div className="relative sm:w-52">
               <select
@@ -426,7 +475,7 @@ export default function ProductsPage() {
                   <td className="p-3 text-slate-500">{p.sku}</td>
                   <td className="p-3 text-slate-600">
                     {formatBDT(
-                      (p.purchasePrice || 0) + (p.additionalCost || 0)
+                      (p.purchasePrice || 0) + (p.additionalCost || 0),
                     )}
                   </td>
                   <td className="p-3 text-slate-600">

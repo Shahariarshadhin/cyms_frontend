@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ExternalLink,
   X,
+  UserRound,
 } from "lucide-react";
 import api from "@/lib/api";
 import Modal from "@/components/Modal";
@@ -285,6 +286,11 @@ export default function ResearchPage() {
                     Est. {formatBDT(item.marketPriceMin)} –{" "}
                     {formatBDT(item.marketPriceMax)}
                   </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                  <UserRound size={11} />
+                  <span>Added by {item.createdBy?.name || "Unknown"}</span>
                 </div>
 
                 <div className="">
