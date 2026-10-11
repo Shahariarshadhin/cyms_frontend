@@ -8,6 +8,7 @@ import {
   ImageIcon,
   PackagePlus,
   PackageMinus,
+  History,
   X,
   ChevronDown,
   AlertTriangle,
@@ -108,6 +109,29 @@ export default function ProductsPage() {
   const [reduceError, setReduceError] = useState("");
 
   const [lightbox, setLightbox] = useState(null); // { src, title } | null
+
+  // Cost History modal state
+  const [historyFor, setHistoryFor] = useState(null); // product being viewed
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+
+  const openHistory = async (product) => {
+    setHistoryFor(product);
+    setHistoryData(null);
+    setHistoryError("");
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get(`/inventory/history/${product._id}`);
+      setHistoryData(data);
+    } catch (err) {
+      setHistoryError(
+        err?.response?.data?.message || "Failed to load cost history",
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -513,6 +537,12 @@ export default function ProductsPage() {
                         <PackageMinus size={14} /> Reduce
                       </button>
                       <button
+                        onClick={() => openHistory(p)}
+                        className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                      >
+                        <History size={14} /> History
+                      </button>
+                      <button
                         onClick={() => openEdit(p)}
                         className="text-brand-600 text-xs font-medium hover:underline"
                       >
@@ -595,6 +625,12 @@ export default function ProductsPage() {
                     className="text-red-600 font-medium hover:underline flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
                   >
                     <PackageMinus size={13} /> Reduce
+                  </button>
+                  <button
+                    onClick={() => openHistory(p)}
+                    className="text-blue-600 font-medium hover:underline flex items-center gap-1"
+                  >
+                    <History size={13} /> History
                   </button>
                   <button
                     onClick={() => openEdit(p)}
@@ -1039,6 +1075,103 @@ export default function ProductsPage() {
           </form>
         )}
       </Modal>
+
+      {/* Cost History Modal */}
+      {historyFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h3 className="font-semibold text-slate-800">
+                Cost History — {historyFor.watchName}
+              </h3>
+              <button
+                onClick={() => {
+                  setHistoryFor(null);
+                  setHistoryData(null);
+                  setHistoryError("");
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {historyLoading && (
+                <p className="text-sm text-slate-400">Loading...</p>
+              )}
+
+              {historyError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  {historyError}
+                </p>
+              )}
+
+              {!historyLoading &&
+                historyData?.batches?.length > 0 &&
+                [...historyData.batches].reverse().map((b, idx) => {
+                  const isLatest = idx === 0;
+                  return (
+                    <div
+                      key={idx}
+                      className={`rounded-lg border p-3 ${
+                        isLatest
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-slate-100"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-slate-700">
+                          {isLatest ? "Latest purchase" : "Previous purchase"}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {new Date(b.purchaseDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+                        <div>
+                          Purchase price:{" "}
+                          <b className="text-slate-800">
+                            {formatBDT(b.purchasePrice)}
+                          </b>
+                        </div>
+                        <div>
+                          Additional cost:{" "}
+                          <b className="text-slate-800">
+                            {formatBDT(b.additionalCost)}
+                          </b>
+                        </div>
+                        <div>
+                          Total cost/unit:{" "}
+                          <b className="text-slate-800">
+                            {formatBDT(b.totalCost)}
+                          </b>
+                        </div>
+                        <div>Supplier: {b.supplier || "—"}</div>
+                      </div>
+                      <div className="flex gap-3 mt-2 text-xs text-slate-400">
+                        <span>Bought: {b.quantityBought}</span>
+                        <span>In stock: {b.quantityInStock}</span>
+                        <span>Sold: {b.quantitySold}</span>
+                        {b.quantityOther > 0 && (
+                          <span>Other: {b.quantityOther}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {!historyLoading &&
+                !historyError &&
+                historyData?.batches?.length === 0 && (
+                  <p className="text-sm text-slate-400">
+                    No purchase history yet.
+                  </p>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
