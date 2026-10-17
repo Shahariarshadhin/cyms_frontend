@@ -32,6 +32,7 @@ const nav = [
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/boosting-cost", label: "Boosting Cost", icon: Rocket},
+  { href: "/activity", label: "Activity", icon: Rocket},
 ];
 
 // Only Super Admin sees Users & Roles management
