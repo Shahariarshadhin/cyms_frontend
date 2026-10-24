@@ -26,6 +26,7 @@ const nav = [
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/product-profit", label: "Profit List", icon: ShoppingCart },
   { href: "/research", label: "Research & Buy", icon: FlaskConical },
   { href: "/deliveries", label: "Delivery", icon: Truck },
   { href: "/expenses", label: "Expenses", icon: Wallet },

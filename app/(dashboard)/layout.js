@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }) {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar title={titles[pathname] || "CYBMS"} onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 lg:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
+        <main className="flex-1 p-4 lg:p-8 container w-full mx-auto">{children}</main>
       </div>
     </div>
   );
